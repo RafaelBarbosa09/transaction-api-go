@@ -1,22 +1,41 @@
 package datasources
 
-import "transaction-api-go/infrastructure/models"
+import (
+	"github.com/jmoiron/sqlx"
+	"transaction-api-go/infrastructure/models"
+)
 
 type AccountRepositoryImpl struct {
-	accounts []models.Account
+	db *sqlx.DB
 }
 
-func NewAccountRepository() *AccountRepositoryImpl {
+func NewAccountRepositoryImpl(db *sqlx.DB) *AccountRepositoryImpl {
 	return &AccountRepositoryImpl{
-		accounts: []models.Account{},
+		db,
 	}
 }
 
-func (repository *AccountRepositoryImpl) GetAll() ([]models.Account, error) {
-	return repository.accounts, nil
+func (repository *AccountRepositoryImpl) Create(account models.Account) (models.Account, error) {
+	var id int64
+	if err := repository.db.QueryRow(
+		"INSERT INTO account (account_holder, active_card, available_limit) VALUES ($1, $2, $3) RETURNING id",
+		account.AccountHolder,
+		account.ActiveCard,
+		account.AvailableLimit,
+	).Scan(&id); err != nil {
+		return models.Account{}, err
+	}
+
+	account.ID = id
+	return account, nil
 }
 
-func (repository *AccountRepositoryImpl) Create(account models.Account) (models.Account, error) {
-	repository.accounts = append(repository.accounts, account)
-	return account, nil
+func (repository *AccountRepositoryImpl) GetAll() ([]models.Account, error) {
+	var accounts []models.Account
+	err := repository.db.Select(&accounts, "SELECT * FROM account")
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts, nil
 }
